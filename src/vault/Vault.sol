@@ -20,7 +20,7 @@ contract Vault is IVault, Initializable {
     uint256 public fundAmount;
     address public distributor;
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
+    // --- Constructor ---
     constructor() {
         _disableInitializers();
     }
