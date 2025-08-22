@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Factory} from "../src/vault/Factory.sol";
-import {Vault} from "../src/vault/Vault.sol";
+import {Factory} from "../../src/vault/Factory.sol";
+import {Vault} from "../../src/vault/Vault.sol";
 
 /**
  * @title DeployFactory

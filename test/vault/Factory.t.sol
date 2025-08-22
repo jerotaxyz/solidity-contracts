@@ -5,11 +5,11 @@ import {Test, console} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Import contracts to be tested and their interfaces/libraries
-import {Factory} from "../src/vault/Factory.sol";
-import {Vault} from "../src/vault/Vault.sol";
-import {IVault} from "../src/vault/interfaces/IVault.sol";
-import {IFactory} from "../src/vault/interfaces/IFactory.sol";
-import {Errors} from "../src/vault/libraries/Errors.sol";
+import {Factory} from "../../src/vault/Factory.sol";
+import {Vault} from "../../src/vault/Vault.sol";
+import {IVault} from "../../src/vault/interfaces/IVault.sol";
+import {IFactory} from "../../src/vault/interfaces/IFactory.sol";
+import {Errors} from "../../src/vault/libraries/Errors.sol";
 
 // --- Mock Contracts ---
 
