@@ -90,7 +90,12 @@ check-env:
 	@if [ -z "$(INITIAL_DISTRIBUTOR)" ]; then echo "❌ INITIAL_DISTRIBUTOR not set"; exit 1; fi
 	@if [ -z "$(FEE_WALLET)" ]; then echo "❌ FEE_WALLET not set"; exit 1; fi
 	@if [ -z "$(CAMPAIGN_FEE_PERCENTAGE)" ]; then echo "❌ CAMPAIGN_FEE_PERCENTAGE not set"; exit 1; fi
-	@if [ -z "$(RPC_URL)" ]; then echo "❌ RPC_URL not set"; exit 1; fi
+	@if [ -z "$(RPC_URL)" ] && [ -z "$(TESTNET_RPC_URL)" ] && [ -z "$(MAINNET_RPC_URL)" ]; then \
+	echo "❌ You must set at least one of: RPC_URL, TESTNET_RPC_URL, or MAINNET_RPC_URL"; \
+	exit 1; \
+	else \
+	echo "✅ RPC configuration looks good"; \
+	fi
 	@echo "✅ All required environment variables are set"
 
 # Deploy to configured network
@@ -112,8 +117,7 @@ deploy: check-env build
 	forge script script/vault/DeployFactory.s.sol:DeployFactory \
 		--rpc-url $(RPC_URL) \
 		--private-key $(PRIVATE_KEY) \
-		--broadcast \
-		--verify
+		--broadcast 
 	@echo ""
 	@echo "✅ Deployment complete! Check deployment-addresses.txt for contract addresses."
 
@@ -135,8 +139,7 @@ deploy-testnet: check-env build
 	forge script script/vault/DeployFactory.s.sol:DeployFactory \
 		--rpc-url $(TESTNET_RPC_URL) \
 		--private-key $(PRIVATE_KEY) \
-		--broadcast \
-		--verify
+		--broadcast 
 	@echo "✅ Testnet deployment complete!"
 
 # Deploy to mainnet
@@ -164,7 +167,6 @@ deploy-mainnet: check-env build
 		--rpc-url $(MAINNET_RPC_URL) \
 		--private-key $(PRIVATE_KEY) \
 		--broadcast \
-		--verify
 	@echo "✅ Mainnet deployment complete!"
 
 # Verify contracts on Etherscan

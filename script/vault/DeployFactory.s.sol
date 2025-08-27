@@ -20,7 +20,7 @@ contract DeployFactory is Script {
         address feeWallet = vm.envAddress("FEE_WALLET");
         uint8 campaignFeePercentage = uint8(vm.envUint("CAMPAIGN_FEE_PERCENTAGE"));
         string memory rpc = vm.envString("RPC_URL");
-        string memory network = "Local";
+        string memory network = vm.envString("NETWORK");
 
         require(deployerPrivateKey != 0, "PRIVATE_KEY must be set in .env");
         require(initialOwner != address(0), "INITIAL_OWNER must be set in .env");
@@ -72,7 +72,7 @@ contract DeployFactory is Script {
         );
 
         // Define the output file path.
-        string memory filePath = "./deployment-addresses.txt";
+        string memory filePath = string.concat("./deployment-addresses-", network, ".txt");
 
         // Write the deployment info to the file.
         vm.writeFile(filePath, deploymentInfo);
