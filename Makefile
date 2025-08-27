@@ -90,18 +90,14 @@ check-env:
 	@if [ -z "$(INITIAL_DISTRIBUTOR)" ]; then echo "❌ INITIAL_DISTRIBUTOR not set"; exit 1; fi
 	@if [ -z "$(FEE_WALLET)" ]; then echo "❌ FEE_WALLET not set"; exit 1; fi
 	@if [ -z "$(CAMPAIGN_FEE_PERCENTAGE)" ]; then echo "❌ CAMPAIGN_FEE_PERCENTAGE not set"; exit 1; fi
-	@if [ -z "$(RPC_URL)" ] && [ -z "$(TESTNET_RPC_URL)" ] && [ -z "$(MAINNET_RPC_URL)" ]; then \
-	echo "❌ You must set at least one of: RPC_URL, TESTNET_RPC_URL, or MAINNET_RPC_URL"; \
-	exit 1; \
-	else \
-	echo "✅ RPC configuration looks good"; \
-	fi
+	@if [ -z "$(NETWORK)" ]; then echo "❌ NETWORK not set"; exit 1; fi
 	@echo "✅ All required environment variables are set"
 
 # Deploy to configured network
 .PHONY: deploy
 deploy: check-env build
 	@echo "Deploying to network: $(RPC_URL)"
+	@echo "Network: $(NETWORK)"
 	@echo "Deployer: $$(cast wallet address $(PRIVATE_KEY) 2>/dev/null || echo 'Unable to derive address')"
 	@echo "Initial Owner: $(INITIAL_OWNER)"
 	@echo "Initial Distributor: $(INITIAL_DISTRIBUTOR)"
@@ -117,19 +113,20 @@ deploy: check-env build
 	forge script script/vault/DeployFactory.s.sol:DeployFactory \
 		--rpc-url $(RPC_URL) \
 		--private-key $(PRIVATE_KEY) \
-		--broadcast 
+		--broadcast
 	@echo ""
-	@echo "✅ Deployment complete! Check deployment-addresses.txt for contract addresses."
+	@echo "✅ Deployment complete! Check deployment-addresses-$(NETWORK).txt for contract addresses."
 
 # Deploy to local Anvil network
 .PHONY: deploy-local
 deploy-local: build
 	@echo "Deploying to local Anvil network..."
+	@export NETWORK=Local; \
 	forge script script/vault/DeployFactory.s.sol:DeployFactory \
 		--rpc-url http://localhost:8545 \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--broadcast
-	@echo "✅ Local deployment complete!"
+	@echo "✅ Local deployment complete! Check deployment-addresses-Local.txt"
 
 # Deploy to testnet
 .PHONY: deploy-testnet
@@ -139,8 +136,8 @@ deploy-testnet: check-env build
 	forge script script/vault/DeployFactory.s.sol:DeployFactory \
 		--rpc-url $(TESTNET_RPC_URL) \
 		--private-key $(PRIVATE_KEY) \
-		--broadcast 
-	@echo "✅ Testnet deployment complete!"
+		--broadcast
+	@echo "✅ Testnet deployment complete! Check deployment-addresses-$(NETWORK).txt"
 
 # Deploy to mainnet
 .PHONY: deploy-mainnet
@@ -166,20 +163,24 @@ deploy-mainnet: check-env build
 	forge script script/vault/DeployFactory.s.sol:DeployFactory \
 		--rpc-url $(MAINNET_RPC_URL) \
 		--private-key $(PRIVATE_KEY) \
-		--broadcast \
-	@echo "✅ Mainnet deployment complete!"
+		--broadcast
+	@echo "✅ Mainnet deployment complete! Check deployment-addresses-$(NETWORK).txt"
 
 # Verify contracts on Etherscan
 .PHONY: verify
 verify: check-env
-	@if [ ! -f "deployment-addresses.txt" ]; then echo "❌ deployment-addresses.txt not found. Deploy first."; exit 1; fi
-	@echo "Verifying contracts on Etherscan..."
-	@FACTORY_ADDRESS=$$(grep "FACTORY_ADDRESS" deployment-addresses.txt | cut -d'=' -f2 | tr -d '\r'); \
-	VAULT_IMPL_ADDRESS=$$(grep "VAULT_IMPLEMENTATION_ADDRESS" deployment-addresses.txt | cut -d'=' -f2 | tr -d '\r'); \
+	@DEPLOYMENT_FILE="deployment-addresses-$(NETWORK).txt"; \
+	if [ ! -f "$$DEPLOYMENT_FILE" ]; then \
+		echo "❌ $$DEPLOYMENT_FILE not found. Deploy first."; \
+		exit 1; \
+	fi; \
+	echo "Verifying contracts on Etherscan..."; \
+	FACTORY_ADDRESS=$$(grep "FACTORY_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
+	VAULT_IMPL_ADDRESS=$$(grep "VAULT_IMPLEMENTATION_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
 	echo "Verifying Factory at $$FACTORY_ADDRESS..."; \
-	forge verify-contract $$FACTORY_ADDRESS src/vault/Factory.sol:Factory --rpc-url $(RPC_URL) || echo "Factory verification failed"; \
+	forge verify-contract $$FACTORY_ADDRESS src/vault/Factory.sol:Factory --rpc-url $(RPC_URL) --etherscan-api-key $(ETHERSCAN_API_KEY) || echo "Factory verification failed"; \
 	echo "Verifying Vault Implementation at $$VAULT_IMPL_ADDRESS..."; \
-	forge verify-contract $$VAULT_IMPL_ADDRESS src/vault/Vault.sol:Vault --rpc-url $(RPC_URL) || echo "Vault verification failed"
+	forge verify-contract $$VAULT_IMPL_ADDRESS src/vault/Vault.sol:Vault --rpc-url $(RPC_URL) --etherscan-api-key $(ETHERSCAN_API_KEY) || echo "Vault verification failed"
 	@echo "✅ Verification complete!"
 
 # Create .env template
@@ -192,6 +193,7 @@ env-template:
 	@echo "INITIAL_DISTRIBUTOR=0x..." >> .env.template
 	@echo "FEE_WALLET=0x..." >> .env.template
 	@echo "CAMPAIGN_FEE_PERCENTAGE=5" >> .env.template
+	@echo "NETWORK=YourNetworkName" >> .env.template
 	@echo "" >> .env.template
 	@echo "# Network URLs" >> .env.template
 	@echo "RPC_URL=https://your-rpc-url" >> .env.template

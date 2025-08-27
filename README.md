@@ -191,7 +191,7 @@ Alternatively, deploy manually with Forge:
 $ forge script script/vault/DeployFactory.s.sol:DeployFactory --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast --verify
 ```
 
-The deployment addresses will be saved to `deployment-addresses.txt`.
+The deployment addresses will be saved to `deployment-addresses-{NETWORK}.txt`.
 
 #### Available Make Commands
 
