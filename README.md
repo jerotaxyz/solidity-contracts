@@ -158,25 +158,53 @@ $ anvil
 
 ### Deploy
 
-First, create a `.env` file with the required configuration:
+#### Quick Start with Makefile
+
+This project includes a Makefile for simplified operations. First, create your environment configuration:
 
 ```shell
-# .env file
-PRIVATE_KEY=0x...
-INITIAL_OWNER=0x...
-INITIAL_DISTRIBUTOR=0x...
-FEE_WALLET=0x...
-CAMPAIGN_FEE_PERCENTAGE=5
-RPC_URL=https://your-rpc-url
+# Create .env template
+$ make env-template
+
+# Copy and edit the template
+$ cp .env.template .env
+# Edit .env with your actual values
 ```
 
-Then deploy the contracts:
+Then deploy using the Makefile:
+
+```shell
+# Deploy to configured network
+$ make deploy
+
+# Or deploy to specific networks
+$ make deploy-local    # Local Anvil
+$ make deploy-testnet  # Testnet
+$ make deploy-mainnet  # Mainnet (with safety prompts)
+```
+
+#### Manual Deployment
+
+Alternatively, deploy manually with Forge:
 
 ```shell
 $ forge script script/vault/DeployFactory.s.sol:DeployFactory --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast --verify
 ```
 
 The deployment addresses will be saved to `deployment-addresses.txt`.
+
+#### Available Make Commands
+
+```shell
+$ make help  # Show all available commands
+```
+
+Common commands:
+- `make build` - Build contracts
+- `make test` - Run tests
+- `make deploy` - Deploy to configured network
+- `make verify` - Verify contracts on Etherscan
+- `make anvil` - Start local development node
 
 ### Cast
 
