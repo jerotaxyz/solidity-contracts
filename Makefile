@@ -26,12 +26,17 @@ help:
 	@echo ""
 	@echo "Network Operations:"
 	@echo "  make anvil          - Start local Anvil node"
-	@echo "  make verify         - Verify contracts on Etherscan"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make gas-snapshot   - Generate gas usage snapshots"
 	@echo "  make check-env      - Validate environment configuration"
 	@echo "  make env-template   - Create .env template file"
+	@echo ""
+	@echo "Verification:"
+	@echo "  make verify-manual  - Show manual verification commands"
+	@echo "  make verify-simple  - Try verification without API key"
+	@echo ""
+	@echo "Note: All deployment commands include automatic contract verification"
 
 # Build contracts
 .PHONY: build
@@ -116,6 +121,8 @@ deploy: check-env build
 		--broadcast
 	@echo ""
 	@echo "✅ Deployment complete! Check deployment-addresses-$(NETWORK).txt for contract addresses."
+	@echo "🔍 Starting contract verification..."
+	@$(MAKE) verify-contracts
 
 # Deploy to local Anvil network
 .PHONY: deploy-local
@@ -138,6 +145,8 @@ deploy-testnet: check-env build
 		--private-key $(PRIVATE_KEY) \
 		--broadcast
 	@echo "✅ Testnet deployment complete! Check deployment-addresses-$(NETWORK).txt"
+	@echo "🔍 Starting contract verification..."
+	@$(MAKE) verify-contracts
 
 # Deploy to mainnet
 .PHONY: deploy-mainnet
@@ -165,23 +174,58 @@ deploy-mainnet: check-env build
 		--private-key $(PRIVATE_KEY) \
 		--broadcast
 	@echo "✅ Mainnet deployment complete! Check deployment-addresses-$(NETWORK).txt"
+	@echo "🔍 Starting contract verification..."
+	@$(MAKE) verify-contracts
 
-# Verify contracts on Etherscan
-.PHONY: verify
-verify: check-env
+
+
+# Verify contracts on Celoscan (called automatically after deployment)
+.PHONY: verify-contracts
+verify-contracts:
 	@DEPLOYMENT_FILE="deployment-addresses-$(NETWORK).txt"; \
 	if [ ! -f "$$DEPLOYMENT_FILE" ]; then \
 		echo "❌ $$DEPLOYMENT_FILE not found. Deploy first."; \
 		exit 1; \
 	fi; \
-	echo "Verifying contracts on Etherscan..."; \
+	echo "Verifying contracts on Celoscan..."; \
 	FACTORY_ADDRESS=$$(grep "FACTORY_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
 	VAULT_IMPL_ADDRESS=$$(grep "VAULT_IMPLEMENTATION_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
-	echo "Verifying Factory at $$FACTORY_ADDRESS..."; \
-	forge verify-contract $$FACTORY_ADDRESS src/vault/Factory.sol:Factory --rpc-url $(RPC_URL) --etherscan-api-key $(ETHERSCAN_API_KEY) || echo "Factory verification failed"; \
 	echo "Verifying Vault Implementation at $$VAULT_IMPL_ADDRESS..."; \
-	forge verify-contract $$VAULT_IMPL_ADDRESS src/vault/Vault.sol:Vault --rpc-url $(RPC_URL) --etherscan-api-key $(ETHERSCAN_API_KEY) || echo "Vault verification failed"
-	@echo "✅ Verification complete!"
+	forge verify-contract $$VAULT_IMPL_ADDRESS \
+		src/vault/Vault.sol:Vault \
+		--chain celo --watch || \
+		echo "⚠️  Vault verification failed"; \
+	echo "Verifying Factory at $$FACTORY_ADDRESS..."; \
+	forge verify-contract $$FACTORY_ADDRESS \
+		src/vault/Factory.sol:Factory \
+		--chain celo --watch \
+		--constructor-args $$(cast abi-encode "constructor(address,address,address,address,uint8)" $(INITIAL_OWNER) $$VAULT_IMPL_ADDRESS $(INITIAL_DISTRIBUTOR) $(FEE_WALLET) $(CAMPAIGN_FEE_PERCENTAGE)) || echo "⚠️  Factory verification failed"
+	@echo "✅ Contract verification complete!"
+
+# Manual verification command (if automatic fails)
+.PHONY: verify-manual
+verify-manual: check-env
+	@echo "Manual contract verification..."
+	@DEPLOYMENT_FILE="deployment-addresses-$(NETWORK).txt"; \
+	if [ ! -f "$$DEPLOYMENT_FILE" ]; then \
+		echo "❌ $$DEPLOYMENT_FILE not found. Deploy first."; \
+		exit 1; \
+	fi; \
+	FACTORY_ADDRESS=$$(grep "FACTORY_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
+	VAULT_IMPL_ADDRESS=$$(grep "VAULT_IMPLEMENTATION_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
+	echo ""; \
+	echo "📋 Manual Verification Commands:"; \
+	echo ""; \
+	echo "Vault Implementation:"; \
+	echo "forge verify-contract $$VAULT_IMPL_ADDRESS src/vault/Vault.sol:Vault --chain celo-alfajores --watch \
+	echo ""; \
+	echo "Factory:"; \
+	echo "forge verify-contract $$FACTORY_ADDRESS src/vault/Factory.sol:Factory --chain celo-alfajores --watch --constructor-args $$(cast abi-encode \"constructor(address,address,address,address,uint8)\" $(INITIAL_OWNER) $$VAULT_IMPL_ADDRESS $(INITIAL_DISTRIBUTOR) $(FEE_WALLET) $(CAMPAIGN_FEE_PERCENTAGE))"; \
+	echo ""; \
+	echo "📋 Alternative: Try without API key (Celoscan might not require it):"; \
+	echo "forge verify-contract $$VAULT_IMPL_ADDRESS src/vault/Vault.sol:Vault --chain celo-alfajores --watch"; \
+	echo "forge verify-contract $$FACTORY_ADDRESS src/vault/Factory.sol:Factory --chain celo-alfajores --watch --constructor-args $$(cast abi-encode \"constructor(address,address,address,address,uint8)\" $(INITIAL_OWNER) $$VAULT_IMPL_ADDRESS $(INITIAL_DISTRIBUTOR) $(FEE_WALLET) $(CAMPAIGN_FEE_PERCENTAGE))"; \
+	echo ""
 
 # Create .env template
 .PHONY: env-template
@@ -200,6 +244,6 @@ env-template:
 	@echo "TESTNET_RPC_URL=https://your-testnet-rpc-url" >> .env.template
 	@echo "MAINNET_RPC_URL=https://your-mainnet-rpc-url" >> .env.template
 	@echo "" >> .env.template
-	@echo "# Etherscan API Key (for verification)" >> .env.template
-	@echo "ETHERSCAN_API_KEY=your-etherscan-api-key" >> .env.template
+	@echo "# Celoscan API Key (for verification)" >> .env.template
+	@echo "CELOSCAN_API_KEY=your-celoscan-api-key" >> .env.template
 	@echo "✅ .env template created! Copy .env.template to .env and fill in your values."

@@ -11,4 +11,11 @@ fs_permissions = [{ access = "write", path = "./"}]
 celo-sepolia = "https://forno.celo-sepolia.celo-testnet.org/"
 celo = "https://forno.celo.org"
 
+[etherscan]
+celo-alfajores = { key = "${CELOSCAN_API_KEY}", url = "https://api-alfajores.celoscan.io/api"}
+celo = { key = "${CELOSCAN_API_KEY}", url = "https://api.celoscan.io/api"}
+
+# Alternative configuration without API key (some Celo networks don't require it)
+# celo-sepolia = { url = "https://api-alfajores.celoscan.io/api"}
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
