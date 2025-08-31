@@ -14,6 +14,8 @@ help:
 	@echo "  make build          - Build the contracts"
 	@echo "  make test           - Run all tests"
 	@echo "  make test-verbose   - Run tests with verbose output"
+	@echo "  make test-token     - Run token tests only"
+	@echo "  make test-token-gas - Run token tests with gas report"
 	@echo "  make coverage       - Generate test coverage report"
 	@echo "  make fmt            - Format code"
 	@echo "  make clean          - Clean build artifacts"
@@ -23,6 +25,12 @@ help:
 	@echo "  make deploy-local   - Deploy to local Anvil network"
 	@echo "  make deploy-testnet - Deploy to testnet (requires TESTNET_RPC_URL)"
 	@echo "  make deploy-mainnet - Deploy to mainnet (requires MAINNET_RPC_URL)"
+	@echo ""
+	@echo "Token Deployment:"
+	@echo "  make deploy-token         - Deploy Jerota token to configured network"
+	@echo "  make deploy-token-local   - Deploy Jerota token to local Anvil network"
+	@echo "  make deploy-token-testnet - Deploy Jerota token to testnet"
+	@echo "  make deploy-token-mainnet - Deploy Jerota token to mainnet"
 	@echo ""
 	@echo "Network Operations:"
 	@echo "  make anvil          - Start local Anvil node"
@@ -109,9 +117,9 @@ deploy: check-env build
 	@echo "Fee Wallet: $(FEE_WALLET)"
 	@echo "Campaign Fee: $(CAMPAIGN_FEE_PERCENTAGE)%"
 	@echo ""
-	@echo "Continue with deployment? [y/N]"; \
+	@echo "Continue with deployment? [Y/n]"; \
 	read confirm; \
-	if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
+	if [ "$$confirm" = "n" ] || [ "$$confirm" = "N" ]; then \
 		echo "Deployment cancelled."; \
 		exit 1; \
 	fi
@@ -247,3 +255,115 @@ env-template:
 	@echo "# Celoscan API Key (for verification)" >> .env.template
 	@echo "CELOSCAN_API_KEY=your-celoscan-api-key" >> .env.template
 	@echo "✅ .env template created! Copy .env.template to .env and fill in your values."
+
+# Token Deployment Commands
+
+# Deploy Jerota token to configured network
+.PHONY: deploy-token
+deploy-token: check-env build
+	@echo "Deploying Jerota token to network: $(RPC_URL)"
+	@echo "Network: $(NETWORK)"
+	@echo "Deployer: $(cast wallet address $(PRIVATE_KEY) 2>/dev/null || echo 'Unable to derive address')"
+	@echo "Initial Owner: $(INITIAL_OWNER)"
+	@echo ""
+	@echo "Continue with token deployment? [Y/n]"; \
+	read confirm; \
+	if [ "$$confirm" = "n" ] || [ "$$confirm" = "N" ]; then \
+		echo "Token deployment cancelled."; \
+		exit 1; \
+	fi
+	forge script script/token/DeployToken.s.sol:DeployToken \
+		--rpc-url $(RPC_URL) \
+		--private-key $(PRIVATE_KEY) \
+		--broadcast
+	@echo ""
+	@echo "✅ Jerota token deployment complete! Check deployment-addresses-$(NETWORK).txt for token address."
+	@echo "🔍 Starting token contract verification..."
+	@$(MAKE) verify-token
+
+# Deploy Jerota token to local Anvil network
+.PHONY: deploy-token-local
+deploy-token-local: build
+	@echo "Deploying Jerota token to local Anvil network..."
+	@export NETWORK=Local; \
+	forge script script/token/DeployToken.s.sol:DeployToken \
+		--rpc-url http://localhost:8545 \
+		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		--broadcast
+	@echo "✅ Local Jerota token deployment complete! Check deployment-addresses-Local.txt"
+
+# Deploy Jerota token to testnet
+.PHONY: deploy-token-testnet
+deploy-token-testnet: check-env build
+	@if [ -z "$(TESTNET_RPC_URL)" ]; then echo "❌ TESTNET_RPC_URL not set"; exit 1; fi
+	@echo "Deploying Jerota token to testnet: $(TESTNET_RPC_URL)"
+	forge script script/token/DeployToken.s.sol:DeployToken \
+		--rpc-url $(TESTNET_RPC_URL) \
+		--private-key $(PRIVATE_KEY) \
+		--broadcast
+	@echo "✅ Testnet Jerota token deployment complete! Check deployment-addresses-$(NETWORK).txt"
+	@echo "🔍 Starting token contract verification..."
+	@$(MAKE) verify-token
+
+# Deploy Jerota token to mainnet
+.PHONY: deploy-token-mainnet
+deploy-token-mainnet: check-env build
+	@if [ -z "$(MAINNET_RPC_URL)" ]; then echo "❌ MAINNET_RPC_URL not set"; exit 1; fi
+	@echo "🚨 MAINNET TOKEN DEPLOYMENT - This will deploy to production!"
+	@echo "Network: $(MAINNET_RPC_URL)"
+	@echo "Deployer: $(cast wallet address $(PRIVATE_KEY) 2>/dev/null || echo 'Unable to derive address')"
+	@echo "Gas Price: $(cast gas-price --rpc-url $(MAINNET_RPC_URL) 2>/dev/null || echo 'Unable to fetch gas price')"
+	@echo ""
+	@echo "Are you absolutely sure you want to deploy Jerota token to MAINNET? [y/N]"; \
+	read confirm; \
+	if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then \
+		echo "Token deployment cancelled."; \
+		exit 1; \
+	fi; \
+	echo "Type 'DEPLOY-TOKEN' to confirm:"; \
+	read confirm2; \
+	if [ "$confirm2" != "DEPLOY-TOKEN" ]; then \
+		echo "Token deployment cancelled."; \
+		exit 1; \
+	fi
+	forge script script/token/DeployToken.s.sol:DeployToken \
+		--rpc-url $(MAINNET_RPC_URL) \
+		--private-key $(PRIVATE_KEY) \
+		--broadcast
+	@echo "✅ Mainnet Jerota token deployment complete! Check deployment-addresses-$(NETWORK).txt"
+	@echo "🔍 Starting token contract verification..."
+	@$(MAKE) verify-token
+
+# Verify Jerota token on Celoscan
+.PHONY: verify-token
+verify-token:
+	@DEPLOYMENT_FILE="deployment-addresses-$(NETWORK).txt"; \
+	if [ ! -f "$$DEPLOYMENT_FILE" ]; then \
+		echo "❌ $$DEPLOYMENT_FILE not found. Deploy token first."; \
+		exit 1; \
+	fi; \
+	if ! grep -q "JEROTA_TOKEN_ADDRESS" "$$DEPLOYMENT_FILE"; then \
+		echo "❌ JEROTA_TOKEN_ADDRESS not found in $$DEPLOYMENT_FILE. Deploy token first."; \
+		exit 1; \
+	fi; \
+	echo "Verifying Jerota token on Celoscan..."; \
+	TOKEN_ADDRESS=$$(grep "JEROTA_TOKEN_ADDRESS" $$DEPLOYMENT_FILE | cut -d'=' -f2 | tr -d '\r'); \
+	echo "Verifying Jerota Token at $$TOKEN_ADDRESS..."; \
+	forge verify-contract $$TOKEN_ADDRESS \
+		src/token/Jerota.sol:Jerota \
+		--chain celo --watch \
+		--constructor-args $$(cast abi-encode "constructor(address)" $(INITIAL_OWNER)) || \
+		echo "⚠️  Jerota token verification failed"
+	@echo "✅ Jerota token verification complete!"
+
+# Test token contracts specifically
+.PHONY: test-token
+test-token:
+	@echo "Running Jerota token tests..."
+	forge test --match-path "test/token/*" -vv
+
+# Test token contracts with gas report
+.PHONY: test-token-gas
+test-token-gas:
+	@echo "Running Jerota token tests with gas report..."
+	forge test --match-path "test/token/*" --gas-report
